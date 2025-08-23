@@ -404,7 +404,7 @@ const ChatInterface = () => {
               key={message.id}
               className={cn(
                 "flex gap-3 max-w-[80%]",
-                message.role === "user" ? "ml-auto" : "mr-auto"
+                message.role === "user" ? "ml-auto flex-row-reverse" : "mr-auto"
               )}
             >
               {message.role === "assistant" && (
@@ -417,7 +417,7 @@ const ChatInterface = () => {
                 className={cn(
                   "px-4 py-3 rounded-2xl",
                   message.role === "user"
-                    ? "bg-message-user text-message-user-foreground ml-2"
+                    ? "bg-message-user text-message-user-foreground"
                     : "bg-message-assistant text-message-assistant-foreground"
                 )}
               >
