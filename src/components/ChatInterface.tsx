@@ -1,9 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { Send, Bot, User, Settings, Loader2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
+import { Send, Bot, User, Settings, Loader2, Save, Database, Wifi, WifiOff } from "lucide-react";
 import { cn } from "@/lib/utils";
+import ChatHistory from "./ChatHistory";
 
 interface Message {
   id: string;
@@ -12,19 +15,101 @@ interface Message {
   timestamp: Date;
 }
 
+interface Conversation {
+  id: string;
+  title: string;
+  lastMessage: string;
+  timestamp: Date;
+  messageCount: number;
+  messages: Message[];
+}
+
 const ChatInterface = () => {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "1",
-      content: "Hello! I'm ready to help you test the Mistral-7B-Instruct-v0.2 model. Start chatting to see how it responds!",
-      role: "assistant",
-      timestamp: new Date(),
-    },
-  ]);
+  const { toast } = useToast();
+  
+  // Current conversation state
+  const [messages, setMessages] = useState<Message[]>([]);
   const [currentMessage, setCurrentMessage] = useState("");
   const [selectedModel] = useState("Mistral-7B-Instruct-v0.2");
   const [isLoading, setIsLoading] = useState(false);
+  
+  // History management
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [currentConversationId, setCurrentConversationId] = useState<string>();
+  const [isConnected, setIsConnected] = useState(false);
+  const [autoSave, setAutoSave] = useState(true);
 
+  // Initialize with welcome message
+  useEffect(() => {
+    if (messages.length === 0) {
+      const welcomeMessage: Message = {
+        id: "welcome",
+        content: "Hello! I'm ready to help you test the Mistral-7B-Instruct-v0.2 model. Your conversations can be saved to your local database.",
+        role: "assistant",
+        timestamp: new Date(),
+      };
+      setMessages([welcomeMessage]);
+    }
+  }, []);
+
+  // Simulate API connection check
+  useEffect(() => {
+    const checkConnection = () => {
+      // Simulate connection check to your local API
+      setIsConnected(Math.random() > 0.2); // 80% connection rate for demo
+    };
+    
+    checkConnection();
+    const interval = setInterval(checkConnection, 30000); // Check every 30s
+    return () => clearInterval(interval);
+  }, []);
+
+  const generateConversationTitle = (firstMessage: string) => {
+    const words = firstMessage.split(' ').slice(0, 6);
+    return words.join(' ') + (words.length < firstMessage.split(' ').length ? '...' : '');
+  };
+
+  const saveConversation = async (conversationData: Conversation) => {
+    try {
+      // Replace with your actual API endpoint
+      const response = await fetch('/api/conversations', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(conversationData),
+      });
+      
+      if (response.ok) {
+        toast({
+          title: "Conversation saved",
+          description: "Your chat has been saved to the database.",
+        });
+        return true;
+      }
+    } catch (error) {
+      console.error('Failed to save conversation:', error);
+      toast({
+        title: "Save failed",
+        description: "Could not save to database. Check your connection.",
+        variant: "destructive",
+      });
+    }
+    return false;
+  };
+
+  const loadConversations = async () => {
+    try {
+      // Replace with your actual API endpoint
+      const response = await fetch('/api/conversations');
+      if (response.ok) {
+        const data = await response.json();
+        setConversations(data);
+      }
+    } catch (error) {
+      console.error('Failed to load conversations:', error);
+    }
+  };
 
   const handleSendMessage = async () => {
     if (!currentMessage.trim()) return;
@@ -36,21 +121,170 @@ const ChatInterface = () => {
       timestamp: new Date(),
     };
 
-    setMessages(prev => [...prev, userMessage]);
+    const updatedMessages = [...messages, userMessage];
+    setMessages(updatedMessages);
     setCurrentMessage("");
     setIsLoading(true);
 
-    // Simulate API call - replace with actual Hugging Face API integration
-    setTimeout(() => {
+    // Create or update conversation
+    if (!currentConversationId) {
+      const newConversation: Conversation = {
+        id: Date.now().toString(),
+        title: generateConversationTitle(currentMessage),
+        lastMessage: currentMessage,
+        timestamp: new Date(),
+        messageCount: 1,
+        messages: updatedMessages,
+      };
+      setCurrentConversationId(newConversation.id);
+      setConversations(prev => [newConversation, ...prev]);
+    }
+
+    // Simulate API call to your local Mistral endpoint
+    try {
+      // Replace with your actual API endpoint
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: selectedModel,
+          message: currentMessage,
+          conversation_id: currentConversationId,
+        }),
+      });
+
+      let assistantResponse = "I'm a demo response. Connect me to your local Mistral API endpoint to get real responses.";
+      
+      if (response.ok) {
+        const data = await response.json();
+        assistantResponse = data.response || data.message || assistantResponse;
+      }
+
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: `Response from Mistral-7B-Instruct-v0.2: This is a simulated response. Connect to Supabase to integrate with the actual Hugging Face API and save chat history.`,
+        content: assistantResponse,
         role: "assistant",
         timestamp: new Date(),
       };
-      setMessages(prev => [...prev, assistantMessage]);
+
+      const finalMessages = [...updatedMessages, assistantMessage];
+      setMessages(finalMessages);
+
+      // Auto-save if enabled
+      if (autoSave && currentConversationId) {
+        const updatedConversation = conversations.find(c => c.id === currentConversationId);
+        if (updatedConversation) {
+          updatedConversation.messages = finalMessages;
+          updatedConversation.lastMessage = assistantResponse;
+          updatedConversation.messageCount = finalMessages.length;
+          updatedConversation.timestamp = new Date();
+          
+          await saveConversation(updatedConversation);
+        }
+      }
+
+    } catch (error) {
+      console.error('Chat API error:', error);
+      toast({
+        title: "API Error",
+        description: "Failed to get response from Mistral API. Check your local server.",
+        variant: "destructive",
+      });
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
+  };
+
+  const handleNewConversation = () => {
+    setMessages([]);
+    setCurrentConversationId(undefined);
+    setCurrentMessage("");
+  };
+
+  const handleSelectConversation = (id: string) => {
+    const conversation = conversations.find(c => c.id === id);
+    if (conversation) {
+      setMessages(conversation.messages);
+      setCurrentConversationId(id);
+    }
+  };
+
+  const handleDeleteConversation = async (id: string) => {
+    try {
+      // Replace with your actual API endpoint
+      await fetch(`/api/conversations/${id}`, { method: 'DELETE' });
+      setConversations(prev => prev.filter(c => c.id !== id));
+      
+      if (currentConversationId === id) {
+        handleNewConversation();
+      }
+      
+      toast({
+        title: "Conversation deleted",
+        description: "The conversation has been removed from your history.",
+      });
+    } catch (error) {
+      console.error('Failed to delete conversation:', error);
+    }
+  };
+
+  const handleExportHistory = () => {
+    const exportData = {
+      conversations,
+      exportDate: new Date().toISOString(),
+      model: selectedModel,
+    };
+    
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+      type: 'application/json',
+    });
+    
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `mistral-chat-history-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    toast({
+      title: "History exported",
+      description: "Your chat history has been downloaded as JSON.",
+    });
+  };
+
+  const handleImportHistory = async (file: File) => {
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      
+      if (data.conversations && Array.isArray(data.conversations)) {
+        setConversations(data.conversations);
+        toast({
+          title: "History imported",
+          description: `Imported ${data.conversations.length} conversations.`,
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Import failed",
+        description: "Invalid file format. Please select a valid JSON export.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleManualSave = async () => {
+    if (currentConversationId) {
+      const conversation = conversations.find(c => c.id === currentConversationId);
+      if (conversation) {
+        conversation.messages = messages;
+        await saveConversation(conversation);
+      }
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -60,17 +294,41 @@ const ChatInterface = () => {
     }
   };
 
+  // Load conversations on component mount
+  useEffect(() => {
+    loadConversations();
+  }, []);
+
   return (
     <div className="flex h-screen bg-chat-background">
-      {/* Sidebar */}
+      {/* Chat History Sidebar */}
+      <ChatHistory
+        conversations={conversations}
+        currentConversationId={currentConversationId}
+        onSelectConversation={handleSelectConversation}
+        onNewConversation={handleNewConversation}
+        onDeleteConversation={handleDeleteConversation}
+        onExportHistory={handleExportHistory}
+        onImportHistory={handleImportHistory}
+      />
+
+      {/* Model Info Sidebar */}
       <div className="w-80 bg-chat-sidebar border-r border-border p-6 flex flex-col">
         <div className="flex items-center gap-3 mb-8">
           <div className="w-10 h-10 bg-gradient-primary rounded-xl flex items-center justify-center">
             <Bot className="w-6 h-6 text-primary-foreground" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-foreground">HF Model Tester</h1>
-            <p className="text-sm text-muted-foreground">Test Hugging Face models</p>
+            <h1 className="text-xl font-bold text-foreground">Mistral Chat</h1>
+            <div className="flex items-center gap-2">
+              <Badge variant={isConnected ? "default" : "destructive"} className="text-xs">
+                {isConnected ? (
+                  <><Wifi className="w-3 h-3 mr-1" /> Connected</>
+                ) : (
+                  <><WifiOff className="w-3 h-3 mr-1" /> Offline</>
+                )}
+              </Badge>
+            </div>
           </div>
         </div>
 
@@ -82,7 +340,7 @@ const ChatInterface = () => {
           </div>
         </div>
 
-        <Card className="p-4 bg-gradient-subtle">
+        <Card className="p-4 bg-gradient-subtle mb-4">
           <h3 className="font-medium text-foreground mb-2">Mistral-7B-Instruct-v0.2</h3>
           <p className="text-sm text-muted-foreground mb-3">Instruction-tuned language model</p>
           <div className="space-y-2 text-xs text-muted-foreground">
@@ -101,15 +359,39 @@ const ChatInterface = () => {
           </div>
         </Card>
 
-        {/* History Feature Info */}
+        {/* Save Controls */}
         <Card className="p-4 bg-muted/20 border-dashed">
-          <h3 className="font-medium text-foreground mb-2">💾 Save Chat History</h3>
-          <p className="text-sm text-muted-foreground mb-3">
-            Connect to Supabase to save and manage your chat conversations.
-          </p>
-          <Button variant="outline" size="sm" className="w-full" disabled>
-            Connect Supabase First
-          </Button>
+          <h3 className="font-medium text-foreground mb-3 flex items-center gap-2">
+            <Database className="w-4 h-4" />
+            Local Database
+          </h3>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>Auto-save:</span>
+              <Badge variant={autoSave ? "default" : "secondary"}>
+                {autoSave ? "ON" : "OFF"}
+              </Badge>
+            </div>
+            <Button
+              variant="outline" 
+              size="sm" 
+              className="w-full"
+              onClick={handleManualSave}
+              disabled={!currentConversationId || !isConnected}
+            >
+              <Save className="w-4 h-4 mr-2" />
+              Save Current Chat
+            </Button>
+            <div className="text-xs text-muted-foreground">
+              API Endpoints:
+              <div className="mt-1 space-y-1">
+                <div>• POST /api/chat</div>
+                <div>• GET /api/conversations</div>
+                <div>• POST /api/conversations</div>
+                <div>• DELETE /api/conversations/:id</div>
+              </div>
+            </div>
+          </div>
         </Card>
       </div>
 
@@ -170,12 +452,12 @@ const ChatInterface = () => {
 
         {/* Input Area */}
         <div className="border-t border-border p-6">
-          <div className="flex gap-3">
+          <div className="flex gap-3 mb-3">
             <Input
               value={currentMessage}
               onChange={(e) => setCurrentMessage(e.target.value)}
               onKeyPress={handleKeyPress}
-              placeholder="Type your message to test the model..."
+              placeholder="Type your message to test Mistral-7B..."
               className="flex-1 bg-background border-border"
               disabled={isLoading}
             />
@@ -187,9 +469,14 @@ const ChatInterface = () => {
               <Send className="w-4 h-4" />
             </Button>
           </div>
-          <p className="text-xs text-muted-foreground mt-2">
-            Press Enter to send, Shift+Enter for new line
-          </p>
+          <div className="flex justify-between items-center text-xs text-muted-foreground">
+            <span>Press Enter to send, Shift+Enter for new line</span>
+            {currentConversationId && (
+              <span className="text-primary">
+                Conversation ID: {currentConversationId.slice(-8)}
+              </span>
+            )}
+          </div>
         </div>
       </div>
     </div>
