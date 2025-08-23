@@ -230,52 +230,6 @@ const ChatInterface = () => {
     }
   };
 
-  const handleExportHistory = () => {
-    const exportData = {
-      conversations,
-      exportDate: new Date().toISOString(),
-      model: selectedModel,
-    };
-    
-    const blob = new Blob([JSON.stringify(exportData, null, 2)], {
-      type: 'application/json',
-    });
-    
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `mistral-chat-history-${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    
-    toast({
-      title: "History exported",
-      description: "Your chat history has been downloaded as JSON.",
-    });
-  };
-
-  const handleImportHistory = async (file: File) => {
-    try {
-      const text = await file.text();
-      const data = JSON.parse(text);
-      
-      if (data.conversations && Array.isArray(data.conversations)) {
-        setConversations(data.conversations);
-        toast({
-          title: "History imported",
-          description: `Imported ${data.conversations.length} conversations.`,
-        });
-      }
-    } catch (error) {
-      toast({
-        title: "Import failed",
-        description: "Invalid file format. Please select a valid JSON export.",
-        variant: "destructive",
-      });
-    }
-  };
 
   const handleManualSave = async () => {
     if (currentConversationId) {
@@ -308,8 +262,6 @@ const ChatInterface = () => {
         onSelectConversation={handleSelectConversation}
         onNewConversation={handleNewConversation}
         onDeleteConversation={handleDeleteConversation}
-        onExportHistory={handleExportHistory}
-        onImportHistory={handleImportHistory}
       />
 
       {/* Chat Area */}

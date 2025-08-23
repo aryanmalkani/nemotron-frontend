@@ -8,9 +8,7 @@ import {
   History, 
   Plus, 
   Search, 
-  Trash2, 
-  Download, 
-  Upload,
+  Trash2,
   MessageSquare,
   Calendar
 } from "lucide-react";
@@ -30,8 +28,6 @@ interface ChatHistoryProps {
   onSelectConversation: (id: string) => void;
   onNewConversation: () => void;
   onDeleteConversation: (id: string) => void;
-  onExportHistory: () => void;
-  onImportHistory: (file: File) => void;
 }
 
 const ChatHistory = ({
@@ -39,9 +35,7 @@ const ChatHistory = ({
   currentConversationId,
   onSelectConversation,
   onNewConversation,
-  onDeleteConversation,
-  onExportHistory,
-  onImportHistory
+  onDeleteConversation
 }: ChatHistoryProps) => {
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -49,13 +43,6 @@ const ChatHistory = ({
     conv.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
     conv.lastMessage.toLowerCase().includes(searchQuery.toLowerCase())
   );
-
-  const handleFileImport = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      onImportHistory(file);
-    }
-  };
 
   const formatDate = (date: Date) => {
     const now = new Date();
@@ -98,35 +85,6 @@ const ChatHistory = ({
           <Plus className="w-4 h-4 mr-2" />
           New Chat
         </Button>
-        
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onExportHistory}
-            className="flex-1"
-          >
-            <Download className="w-4 h-4 mr-1" />
-            Export
-          </Button>
-          
-          <Button
-            variant="outline"
-            size="sm"
-            className="flex-1"
-            onClick={() => document.getElementById('file-import')?.click()}
-          >
-            <Upload className="w-4 h-4 mr-1" />
-            Import
-          </Button>
-          <input
-            id="file-import"
-            type="file"
-            accept=".json"
-            onChange={handleFileImport}
-            className="hidden"
-          />
-        </div>
       </div>
 
       <Separator />
