@@ -30,7 +30,7 @@ const ChatInterface = () => {
   // Current conversation state
   const [messages, setMessages] = useState<Message[]>([]);
   const [currentMessage, setCurrentMessage] = useState("");
-  const [selectedModel] = useState("Mistral-7B-Instruct-v0.2");
+  const [selectedModel] = useState("Llama-3.1-Nemotron-Nano-4B-v1.1");
   const [isLoading, setIsLoading] = useState(false);
   
   // History management
@@ -44,7 +44,7 @@ const ChatInterface = () => {
     if (messages.length === 0) {
       const welcomeMessage: Message = {
         id: "welcome",
-        content: "Hello! I'm ready to help you test the Mistral-7B-Instruct-v0.2 model. Your conversations can be saved to your local database.",
+        content: "Hello! I'm ready to help you test the Llama-3.1-Nemotron-Nano-4B-v1.1 model. Your conversations can be saved to your local database.",
         role: "assistant",
         timestamp: new Date(),
       };
@@ -155,7 +155,7 @@ const ChatInterface = () => {
         }),
       });
 
-      let assistantResponse = "I'm a demo response. Connect me to your local Mistral API endpoint to get real responses.";
+      let assistantResponse = "I'm a demo response. Connect me to your local Llama API endpoint to get real responses.";
       
       if (response.ok) {
         const data = await response.json();
@@ -189,7 +189,7 @@ const ChatInterface = () => {
       console.error('Chat API error:', error);
       toast({
         title: "API Error",
-        description: "Failed to get response from Mistral API. Check your local server.",
+        description: "Failed to get response from Llama API. Check your local server.",
         variant: "destructive",
       });
     } finally {
@@ -326,7 +326,7 @@ const ChatInterface = () => {
               value={currentMessage}
               onChange={(e) => setCurrentMessage(e.target.value)}
               onKeyPress={handleKeyPress}
-              placeholder="Type your message to test Mistral-7B..."
+              placeholder="Type your message to test Llama-3.1-Nemotron-Nano-4B-v1.1..."
               className="flex-1 bg-background border-border"
               disabled={isLoading}
             />
