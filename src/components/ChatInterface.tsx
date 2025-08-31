@@ -1,12 +1,9 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Send, Bot, User, Settings, Loader2, Save, Database, Wifi, WifiOff } from "lucide-react";
+import { Send, Bot, User, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import ChatHistory from "./ChatHistory";
 
 interface Message {
   id: string;
@@ -15,101 +12,26 @@ interface Message {
   timestamp: Date;
 }
 
-interface Conversation {
-  id: string;
-  title: string;
-  lastMessage: string;
-  timestamp: Date;
-  messageCount: number;
-  messages: Message[];
-}
-
 const ChatInterface = () => {
   const { toast } = useToast();
   
-  // Current conversation state
   const [messages, setMessages] = useState<Message[]>([]);
   const [currentMessage, setCurrentMessage] = useState("");
   const [selectedModel] = useState("Llama-3.1-Nemotron-Nano-4B-v1.1");
   const [isLoading, setIsLoading] = useState(false);
-  
-  // History management
-  const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [currentConversationId, setCurrentConversationId] = useState<string>();
-  const [isConnected, setIsConnected] = useState(false);
-  const [autoSave, setAutoSave] = useState(true);
 
   // Initialize with welcome message
   useEffect(() => {
     if (messages.length === 0) {
       const welcomeMessage: Message = {
         id: "welcome",
-        content: "Hello! I'm ready to help you test the Llama-3.1-Nemotron-Nano-4B-v1.1 model. Your conversations can be saved to your local database.",
+        content: "Hello! I'm ready to help you test the Llama-3.1-Nemotron-Nano-4B-v1.1 model.",
         role: "assistant",
         timestamp: new Date(),
       };
       setMessages([welcomeMessage]);
     }
   }, []);
-
-  // Simulate API connection check
-  useEffect(() => {
-    const checkConnection = () => {
-      // Simulate connection check to your local API
-      setIsConnected(Math.random() > 0.2); // 80% connection rate for demo
-    };
-    
-    checkConnection();
-    const interval = setInterval(checkConnection, 30000); // Check every 30s
-    return () => clearInterval(interval);
-  }, []);
-
-  const generateConversationTitle = (firstMessage: string) => {
-    const words = firstMessage.split(' ').slice(0, 6);
-    return words.join(' ') + (words.length < firstMessage.split(' ').length ? '...' : '');
-  };
-
-  const saveConversation = async (conversationData: Conversation) => {
-    try {
-      // Replace with your actual API endpoint
-      const response = await fetch('/api/conversations', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(conversationData),
-      });
-      
-      if (response.ok) {
-        toast({
-          title: "Conversation saved",
-          description: "Your chat has been saved to the database.",
-        });
-        return true;
-      }
-    } catch (error) {
-      console.error('Failed to save conversation:', error);
-      toast({
-        title: "Save failed",
-        description: "Could not save to database. Check your connection.",
-        variant: "destructive",
-      });
-    }
-    return false;
-  };
-
-  const loadConversations = async () => {
-    try {
-      // Replace with your actual API endpoint
-      const response = await fetch('/api/conversations');
-      if (response.ok) {
-        const data = await response.json();
-        setConversations(data);
-      }
-    } catch (error) {
-      console.error('Failed to load conversations:', error);
-    }
-  };
 
   const handleSendMessage = async () => {
     if (!currentMessage.trim()) return;
@@ -126,21 +48,6 @@ const ChatInterface = () => {
     setCurrentMessage("");
     setIsLoading(true);
 
-    // Create or update conversation
-    if (!currentConversationId) {
-      const newConversation: Conversation = {
-        id: Date.now().toString(),
-        title: generateConversationTitle(currentMessage),
-        lastMessage: currentMessage,
-        timestamp: new Date(),
-        messageCount: 1,
-        messages: updatedMessages,
-      };
-      setCurrentConversationId(newConversation.id);
-      setConversations(prev => [newConversation, ...prev]);
-    }
-
-    // Simulate API call to your local Mistral endpoint
     try {
       // Replace with your actual API endpoint
       const response = await fetch('/api/chat', {
@@ -151,7 +58,6 @@ const ChatInterface = () => {
         body: JSON.stringify({
           model: selectedModel,
           message: currentMessage,
-          conversation_id: currentConversationId,
         }),
       });
 
@@ -172,19 +78,6 @@ const ChatInterface = () => {
       const finalMessages = [...updatedMessages, assistantMessage];
       setMessages(finalMessages);
 
-      // Auto-save if enabled
-      if (autoSave && currentConversationId) {
-        const updatedConversation = conversations.find(c => c.id === currentConversationId);
-        if (updatedConversation) {
-          updatedConversation.messages = finalMessages;
-          updatedConversation.lastMessage = assistantResponse;
-          updatedConversation.messageCount = finalMessages.length;
-          updatedConversation.timestamp = new Date();
-          
-          await saveConversation(updatedConversation);
-        }
-      }
-
     } catch (error) {
       console.error('Chat API error:', error);
       toast({
@@ -197,50 +90,6 @@ const ChatInterface = () => {
     }
   };
 
-  const handleNewConversation = () => {
-    setMessages([]);
-    setCurrentConversationId(undefined);
-    setCurrentMessage("");
-  };
-
-  const handleSelectConversation = (id: string) => {
-    const conversation = conversations.find(c => c.id === id);
-    if (conversation) {
-      setMessages(conversation.messages);
-      setCurrentConversationId(id);
-    }
-  };
-
-  const handleDeleteConversation = async (id: string) => {
-    try {
-      // Replace with your actual API endpoint
-      await fetch(`/api/conversations/${id}`, { method: 'DELETE' });
-      setConversations(prev => prev.filter(c => c.id !== id));
-      
-      if (currentConversationId === id) {
-        handleNewConversation();
-      }
-      
-      toast({
-        title: "Conversation deleted",
-        description: "The conversation has been removed from your history.",
-      });
-    } catch (error) {
-      console.error('Failed to delete conversation:', error);
-    }
-  };
-
-
-  const handleManualSave = async () => {
-    if (currentConversationId) {
-      const conversation = conversations.find(c => c.id === currentConversationId);
-      if (conversation) {
-        conversation.messages = messages;
-        await saveConversation(conversation);
-      }
-    }
-  };
-
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -248,24 +97,10 @@ const ChatInterface = () => {
     }
   };
 
-  // Load conversations on component mount
-  useEffect(() => {
-    loadConversations();
-  }, []);
-
   return (
     <div className="flex h-screen bg-chat-background">
-      {/* Chat History Sidebar */}
-      <ChatHistory
-        conversations={conversations}
-        currentConversationId={currentConversationId}
-        onSelectConversation={handleSelectConversation}
-        onNewConversation={handleNewConversation}
-        onDeleteConversation={handleDeleteConversation}
-      />
-
       {/* Chat Area */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col max-w-4xl mx-auto">
         {/* Messages */}
         <div className="flex-1 overflow-y-auto p-6 space-y-4">
           {messages.map((message) => (
@@ -338,13 +173,8 @@ const ChatInterface = () => {
               <Send className="w-4 h-4" />
             </Button>
           </div>
-          <div className="flex justify-between items-center text-xs text-muted-foreground">
+          <div className="text-xs text-muted-foreground">
             <span>Press Enter to send, Shift+Enter for new line</span>
-            {currentConversationId && (
-              <span className="text-primary">
-                Conversation ID: {currentConversationId.slice(-8)}
-              </span>
-            )}
           </div>
         </div>
       </div>
